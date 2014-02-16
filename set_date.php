@@ -7,4 +7,5 @@
 	
 	$_SESSION["from"] = $_GET["from"]["year"]."-".$_GET["from"]["month"]."-".$_GET["from"]["day"];
 	$_SESSION["to"] = $_SESSION["from"];	
+	echo $_SESSION["to"];
 ?>

@@ -1,51 +1,40 @@
 <?php
-	set_include_path(get_include_path() . PATH_SEPARATOR . dirname(__FILE__).'/google-api-php-client/src/');
-	
-	require_once dirname(__FILE__).'/google-api-php-client/src/Google/Client.php';
-	require_once dirname(__FILE__).'/google-api-php-client/src/Google/Service/Analytics.php';
-
-	session_start();
-
-	//set initial session
-	if(!isset($_SESSION["from"])) {
-		$_SESSION["from"] = date("Y-m-d");
-		$_SESSION["to"] = date("Y-m-d");
-	}
-
-	$scriptUri = "http://".$_SERVER["HTTP_HOST"].$_SERVER['PHP_SELF'];
-
-	$client = new Google_Client();
-	$client->setApplicationName('VRM');
-
-	// Visit https://cloud.google.com/console to generate your
-	// client id, client secret, and to register your redirect uri.
-	$client->setClientId('98442211070-873rc4ag7nmoluf2l1q96i12470upou2.apps.googleusercontent.com');
-	$client->setClientSecret('d4oVBGPtaOgzoMrazL1cUmwj');
-	$client->setRedirectUri($scriptUri);
-	//$client->setDeveloperKey('AIzaSyD2CwqRvK9hGy6aplKMeFH_gbug1AuhodU');
-	$client->setScopes(array('https://www.googleapis.com/auth/analytics.readonly'));
-
-	// Magic. Returns objects from the Analytics Service instead of associative arrays.
-	//$client->setUseObjects(true);
-
-	if (isset($_GET['code'])) {
-	  $client->authenticate($_GET['code']);
-	  $_SESSION['token'] = $client->getAccessToken();
-	  $redirect = 'http://' . $_SERVER['HTTP_HOST'] . $_SERVER['PHP_SELF'];
-	  header('Location: ' . filter_var($redirect, FILTER_SANITIZE_URL));
-	}
-
-	if (isset($_SESSION['token'])) {
-	  $client->setAccessToken($_SESSION['token']);
-	}
-	?>
+	require_once("lib/config.php");
+?>
 <html>
 <title>Dashboard</title>
 	<head>
 		<script src="bower_components/jquery/dist/jquery.js"></script>
 		<script src="bower_components/bootstrap/dist/js/bootstrap.js"></script>		
 		<link rel="stylesheet" type="text/css" href="bower_components/bootstrap/dist/css/bootstrap.css">
+		<style type="text/css">
+		.report-widget { width: 400px; height: 300px; float: left; }
+		</style>
+		<script type="text/javascript">
+		var reports = {
+			items: new Array(),
+			register: function(data) {
+				reports.items.push(data);
+			},
+			init: function() {
+				$('#widgets').empty();
+				for(var i=0; i<reports.items.length; i++) {
+					reports.render(reports.items[i]);
+				}
+			},
+			
+			render: function (data) {
+				 var d = {date: data.date, type: data.type};
+				 $.get('render_report.php', d, function(data) {
+					$('#widgets').append(data);
+			 	});
+			}
+		};	
 		
+		$(document).ready(function() {
+			reports.init();
+		});	
+		</script>
 	</head>
 	<body>
 	
@@ -108,12 +97,15 @@
 			var d = f.find("select[name=from_day]").val();
 			var m = f.find("select[name=from_month]").val();
 			var y = f.find("select[name=from_year]").val();
-			$.get("set_date.php", { from: {day:d, month: m, year: y}});
+			$.get("set_date.php", { from: {day:d, month: m, year: y}}, function(data) { reports.init(); $('#date').text("Dashboard for "+data)});
 		}
 		</script>
 		
 	    <div class="container-fluid">
-			<?php echo $_SESSION["from"]; ?>
+			<?php 
+				echo $_SESSION["from"]; 
+				list($year, $month, $day) = explode("-", $_SESSION["from"]);
+			?>
 			<div class="date-setter">
 				<form action="set_date.php" onsubmit="setDate($(this)); return false;">
 					<fieldset>
@@ -133,55 +125,52 @@
 							<?php endfor;?>
 						</select>
 					</fieldset>
-					<input type="submit" value="Set date"/>
+					<p></p>
+					<p><input type="submit" value="Set date" class="btn btn-primary"/></p>
 				</form>
 			</div>
 
-			   		<h1 class="page-header">Dashboard</h1>
+			   		<h1 class="page-header" id="date">Dashboard</h1>
 					<!-- content -->
 					<?php
 					if (!$client->getAccessToken() || $client->isAccessTokenExpired()) {
 					  $authUrl = $client->createAuthUrl();
 					  print "<a class='login' href='$authUrl'>Connect Me!</a>";
 
-					} else {
-					  // Create analytics service object. 
-					  $analytics = new Google_Service_Analytics($client);
+					} else {					
 					  if(isset($_GET["profile_id"])) {
 						  $_SESSION["profile_id"] = $_GET["profile_id"];
 					  }	  
-						calculateResults($analytics);	
-						printAccounts($analytics);	
-					    //runMainDemo($analytics);
 					}
 					?>	
 		 </div>
+		 <div class="col-md-4">
+			 <?php if($_SESSION["ga_connected"]): ?>
+				 <?php printAccounts($analytics);?>
+			 <?php endif;?>
+		 </div>
+		 <div class="col-md-8">
+		 	<div id="widgets">
+			</div> 
+		 </div>
+		 <script type="text/javascript">
 
+		 reports.register({type:'visits', date:'<?php echo $_SESSION["from"]; ?>'});
+		 </script>
 	<?php  
-	
-	function calculateResults(&$analytics) {
-  	  if(isset($_GET["property_id"])) {
-  		$webproperties = $analytics->management_webproperties->listManagementWebproperties($_GET["account_id"]);		  
-  		  foreach($webproperties as $wp) {
-  			  if($_GET["property_id"] == $wp["id"]) {				    				 
-  				  $profiles = $analytics->management_profiles->listManagementProfiles($_GET["account_id"], $_GET["property_id"]);
-  				  $profile = $profiles["items"][0];
-  				  $_SESSION["profile_id"] = $profile["id"];
-  				  $results = getResults($analytics, $_SESSION["profile_id"]);
-  				  printResults($results);
-  			  }
-  		  }	      		  
-  	  }
-	}
-	
+		
 	function printAccounts(&$analytics) {
   	  $accounts = $analytics->management_accounts->listManagementAccounts();
 	  $items = $accounts->getItems();
 
-	  foreach($items as $item) {		  
-		  echo "<h2>".$item["name"]."</h2>";		  
+	  foreach($items as $item) {		  		  
    		  $webproperties = $analytics->management_webproperties->listManagementWebproperties($item["id"]);		  		 
-		  echo "<ul>";
+		  echo '<ul class="nav nav-pills">';
+		  echo '<li class="dropdown">';
+		  echo '<a class="dropdown-toggle" data-toggle="dropdown" href="#">';
+		  echo $item["name"];
+		  echo '<span class="caret"></span></a>';
+		  echo '<ul class="dropdown-menu">';
 		  foreach($webproperties as $wp) {
 			  echo '<li>';
 			  echo '<a href="index.php?property_id='.$wp["id"].'&account_id='.$item->getId().'">';
@@ -189,8 +178,9 @@
 			  echo '</a>';
 			  echo '</li>';
 		  }
-		  echo "</ul>";
+		  echo "</ul></li></ul>";
 	  }
+
 	}
 	
 	function runMainDemo(&$analytics) {
@@ -217,49 +207,32 @@
 	  }
 	}
 	
-	function getFirstprofileId(&$analytics) {
-	  $accounts = $analytics->management_accounts->listManagementAccounts();
-
-	  if (count($accounts->getItems()) > 0) {
-	    $items = $accounts->getItems();
-	    $firstAccountId = $items[0]->getId();
-
-	    $webproperties = $analytics->management_webproperties->listManagementWebproperties($firstAccountId);
-
-	    if (count($webproperties->getItems()) > 0) {
-	      $items = $webproperties->getItems();
-	      $firstWebpropertyId = $items[0]->getId();
-
-	      $profiles = $analytics->management_profiles
-	          ->listManagementProfiles($firstAccountId, $firstWebpropertyId);
-
-	      if (count($profiles->getItems()) > 0) {
-	        $items = $profiles->getItems();
-	        return $items[0]->getId();
-
-	      } else {
-	        throw new Exception('No views (profiles) found for this user.');
-	      }
-	    } else {
-	      throw new Exception('No webproperties found for this user.');
-	    }
-	  } else {
-	    throw new Exception('No accounts found for this user.');
-	  }
-	}
 	
-	function getResults(&$analytics, $profileId) {
+	
+	/**
+	*
+	* ga:pageviews, ga:visits
+	* filters=ga:pagePath=~/[^/]+/view/
+	*
+	**/
+	function getResults(&$analytics, $profileId, $key='ga:visits') {
+		$options = array('filters' => 'ga:pagePath=~.*[0-9]+\.htm');
+
 	   return $analytics->data_ga->get(
 	       'ga:' . $profileId,
-	       $_SESSION["from"],
+		   $_SESSION["from"],
 	       $_SESSION["to"],
-	       'ga:visits');
+	       $key, $options);
 	}
 	
 	function printResults(&$results) {
+		print_r($results);
 	  if (count($results->getRows()) > 0) {
 	    $profileName = $results->getProfileInfo()->getProfileName();
 	    $rows = $results->getRows();
+		echo "<pre>";
+		print_r($results);
+		echo "</pre>";
 	    $visits = $rows[0][0];
 
 	    print "<p>First view (profile) found: $profileName</p>";
@@ -269,6 +242,6 @@
 	    print '<p>No results found.</p>';
 	  }
 	}
-?>
+?>Done.
 </body>
 </html>
