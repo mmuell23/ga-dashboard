@@ -7,6 +7,7 @@ require_once dirname(__FILE__).'/google-api-php-client/src/Google/Client.php';
 require_once dirname(__FILE__).'/google-api-php-client/src/Google/Service/Analytics.php';
 require_once dirname(__FILE__).'/class.report.php';
 require_once dirname(__FILE__).'/class.visit.report.php';
+require_once dirname(__FILE__).'/constants.php';
 
 session_start();
 
@@ -26,8 +27,8 @@ $client->setApplicationName('VRM');
 
 // Visit https://cloud.google.com/console to generate your
 // client id, client secret, and to register your redirect uri.
-$client->setClientId('98442211070-873rc4ag7nmoluf2l1q96i12470upou2.apps.googleusercontent.com');
-$client->setClientSecret('d4oVBGPtaOgzoMrazL1cUmwj');
+$client->setClientId(CLIENT_ID);
+$client->setClientSecret(CLIENT_SECRET);
 $client->setRedirectUri($scriptUri);
 //$client->setDeveloperKey('AIzaSyD2CwqRvK9hGy6aplKMeFH_gbug1AuhodU');
 $client->setScopes(array('https://www.googleapis.com/auth/analytics.readonly'));
