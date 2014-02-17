@@ -21,13 +21,24 @@
 		}
 		
 		public function getResults() {
-			//MySQL: date, profile_id, key, value
-		   $this->results = DashReport::$analytics->data_ga->get(
-		       'ga:' . $this->profile_id,
-		       $this->date,
-		       $this->date,
-		       $this->key, 
-			   $this->options);
+			
+			$s = md5(serialize($this->options).$this->key.$this->date.$this->profile_id);
+			
+			$sql = "SELECT * FROM log WHERE `key`='$s'";
+			$qy = mysql_query($sql) or die($sql);
+			
+			if(!mysql_num_rows($qy)) {
+				//MySQL: date, profile_id, key, value
+			   $this->results = DashReport::$analytics->data_ga->get(
+			       'ga:' . $this->profile_id,
+			       $this->date,
+			       $this->date,
+			       $this->key, 
+				   $this->options);
+			} else {
+				
+			}
+			
 			   
 		    return $this->results;
 		}

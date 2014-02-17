@@ -9,6 +9,9 @@ require_once dirname(__FILE__).'/class.report.php';
 require_once dirname(__FILE__).'/class.visit.report.php';
 require_once dirname(__FILE__).'/constants.php';
 
+$con = mysql_connect("localhost","root","root") or die("no connect 1");
+$db = mysql_select_db("dashboard") or die("no connect 2");
+
 session_start();
 
 //set initial session
